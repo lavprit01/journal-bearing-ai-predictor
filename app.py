@@ -210,7 +210,7 @@ if predict_btn:
         ]
         st.info("✅ Exact match found in Table 8.6 — showing validation error")
 
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(table_data), use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -316,7 +316,7 @@ else:
     df[['LD', 'epsilon', 'S', 'RCf', 'phi', 'Pmax']],
     use_container_width=True,
     hide_index=True,
-    height=500
+    height=600  # increase height so more rows are visible
     )
 
 # ── Footer ──
