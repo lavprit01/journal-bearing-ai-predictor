@@ -29,12 +29,20 @@ st.set_page_config(
 # ── Load models (cached so loads only once) ──
 @st.cache_resource
 def load_all_models():
+    import sys
+    import os
+    # ── Add project root to path ──
+    sys.path.insert(0, os.path.abspath('.'))
+
+    import joblib
+    import tensorflow as tf
+    # ── Import classes before loading pkl ──
+    from src.models_definition import RBNN, GRNN
+
     scaler_X = joblib.load('models/scaler_X.pkl')
     scaler_y = joblib.load('models/scaler_y.pkl')
-    if TF_AVAILABLE:
-        ffnn = tf.keras.models.load_model('models/ffnn_model.keras')
-    else:
-        ffnn = None
+    ffnn     = tf.keras.models.load_model(
+                   'models/ffnn_model.keras')
     rbnn     = joblib.load('models/rbnn_model.pkl')
     grnn     = joblib.load('models/grnn_model.pkl')
     df       = pd.read_csv('data/table86_data.csv')
