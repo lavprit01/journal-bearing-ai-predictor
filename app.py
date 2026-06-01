@@ -31,18 +31,14 @@ st.set_page_config(
 def load_all_models():
     import sys
     import os
-    # ── Add project root to path ──
     sys.path.insert(0, os.path.abspath('.'))
-
     import joblib
-    import tensorflow as tf
-    # ── Import classes before loading pkl ──
     from src.models_definition import RBNN, GRNN
+    from src.ffnn_numpy import FFNNNumpy
 
     scaler_X = joblib.load('models/scaler_X.pkl')
     scaler_y = joblib.load('models/scaler_y.pkl')
-    ffnn     = tf.keras.models.load_model(
-                   'models/ffnn_model.keras')
+    ffnn     = FFNNNumpy('models/ffnn_weights.npy')
     rbnn     = joblib.load('models/rbnn_model.pkl')
     grnn     = joblib.load('models/grnn_model.pkl')
     df       = pd.read_csv('data/table86_data.csv')
@@ -61,7 +57,7 @@ def inverse_transform(y_scaled):
 
 def predict(LD_val, eps_val):
     X = scaler_X.transform([[LD_val, eps_val]])
-    pf = inverse_transform(ffnn.predict(X, verbose=0))[0] if ffnn else np.zeros(4)
+    pf = inverse_transform(ffnn.predict(X))[0] if ffnn else np.zeros(4)
     pr = inverse_transform(rbnn.predict(X))[0]
     pg = inverse_transform(grnn.predict(X))[0]
     return pf, pr, pg

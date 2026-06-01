@@ -1,7 +1,6 @@
 # src/models_definition.py
-# ── NO tensorflow import here ──
-# This file only contains RBNN and GRNN
-# so pkl files can load without tensorflow
+# NO tensorflow import here
+# Only RBNN and GRNN classes
 
 import numpy as np
 from sklearn.cluster import KMeans
