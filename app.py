@@ -210,11 +210,7 @@ if predict_btn:
         ]
         st.info("✅ Exact match found in Table 8.6 — showing validation error")
 
-    st.dataframe(
-        pd.DataFrame(table_data),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -315,7 +311,13 @@ else:
     col3.metric("ε Values per L/D", df['epsilon'].nunique())
     col4.metric("Output Parameters", "4")
 
-    st.dataframe(df.head(20), use_container_width=True, hide_index=True)
+    st.markdown(f"Showing all **{len(df)} rows** from Table 8.6")
+    st.dataframe(
+    df[['LD', 'epsilon', 'S', 'RCf', 'phi', 'Pmax']],
+    use_container_width=True,
+    hide_index=True,
+    height=500
+    )
 
 # ── Footer ──
 st.divider()
