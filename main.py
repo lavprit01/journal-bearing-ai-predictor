@@ -29,12 +29,12 @@ print("  JOURNAL BEARING AI PROJECT")
 print("  3 Models: FFNN | RBNN | GRNN")
 print("="*50)
 
-# ── Step 1: Load data ──
+#  Step 1: Load data 
 print("\n[1/6] Loading data...")
 df = load_data('data/table86_data.csv')
 explore_data(df)
 
-# ── Step 2: Prepare data ──
+#  Step 2: Prepare data 
 print("\n[2/6] Preparing data...")
 (X_tr, X_val, X_te,
  y_tr, y_val, y_te,
@@ -44,20 +44,20 @@ joblib.dump(scaler_X, 'models/scaler_X.pkl')
 joblib.dump(scaler_y, 'models/scaler_y.pkl')
 print("     Scalers saved.")
 
-# ── Step 3: Train FFNN ──
+#  Step 3: Train FFNN 
 print("\n[3/6] Training FFNN...")
 ffnn = train_ffnn(X_tr, y_tr, X_val, y_val,
                   epochs=3000)
 
-# ── Step 4: Train RBNN ──
+#  Step 4: Train RBNN 
 print("\n[4/6] Training RBNN...")
 rbnn = train_rbnn(X_tr, y_tr)
 
-# ── Step 5: Train GRNN ──
+#  Step 5: Train GRNN 
 print("\n[5/6] Training GRNN...")
 grnn = train_grnn(X_tr, y_tr)
 
-# ── Step 6: Evaluate ──
+#  Step 6: Evaluate 
 print("\n[6/6] Evaluating all models...")
 
 pred_ffnn = ffnn.predict(X_te, verbose=0)
@@ -68,7 +68,7 @@ m_ffnn = evaluate_model('FFNN', y_te, pred_ffnn)
 m_rbnn = evaluate_model('RBNN', y_te, pred_rbnn)
 m_grnn = evaluate_model('GRNN', y_te, pred_grnn)
 
-# ── Error comparison table ──
+#  Error comparison table 
 print("\n" + "="*70)
 print("  FINAL ERROR COMPARISON TABLE (on test set)")
 print("="*70)
@@ -91,7 +91,7 @@ for i, p in enumerate(params):
           f"→ {best_name}")
 print("="*70)
 
-# ── Plots ──
+#  Plots 
 print("\nSaving plots...")
 regression_plot(y_te, pred_ffnn, 'FFNN')
 regression_plot(y_te, pred_rbnn, 'RBNN')
@@ -107,7 +107,7 @@ plot_predictions(
 
 plot_error_comparison(m_ffnn, m_rbnn, m_grnn)
 
-# ── Timing ──
+#  Timing 
 print("\n--- Prediction Times ---")
 t_ffnn = time_model(ffnn, X_te, 'keras')
 t_rbnn = time_model(rbnn, X_te, 'custom')

@@ -17,9 +17,9 @@ os.makedirs('models',        exist_ok=True)
 os.makedirs('results/plots', exist_ok=True)
 
 
-# ══════════════════════════════
+
 #  FFNN
-# ══════════════════════════════
+
 def build_ffnn(input_dim=2, output_dim=4):
     model = keras.Sequential([
         layers.Input(shape=(input_dim,)),

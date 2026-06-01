@@ -1,7 +1,3 @@
-# src/models_definition.py
-# NO tensorflow import here
-# Only RBNN and GRNN classes
-
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.linear_model import Ridge
