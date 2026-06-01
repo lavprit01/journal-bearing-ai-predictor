@@ -218,6 +218,14 @@ if st.session_state.predictions is not None:
             f"{abs(pf[i] - actual[param_keys[i]]) / (abs(actual[param_keys[i]]) + 1e-10) * 100:.2f}%"
             for i in range(4)
         ]
+        table_data['RBNN Error %'] = [
+            f"{abs(pr[i] - actual[param_keys[i]]) / (abs(actual[param_keys[i]]) + 1e-10) * 100:.2f}%"
+            for i in range(4)
+        ]
+        table_data['GRNN Error %'] = [
+            f"{abs(pg[i] - actual[param_keys[i]]) / (abs(actual[param_keys[i]]) + 1e-10) * 100:.2f}%"
+            for i in range(4)
+        ]
         st.info("✅ Exact match found in Table 8.6 — showing validation error")
 
     # Show prediction table (NOT the raw df)
