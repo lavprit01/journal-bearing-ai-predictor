@@ -1,5 +1,3 @@
-# app.py  —  run with: streamlit run app.py
-
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -19,14 +17,14 @@ sys.path.insert(0, os.path.abspath('.'))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
-# ── Page config ──
+#  - - Page config  - -
 st.set_page_config(
     page_title="Journal Bearing AI",
     page_icon="⚙️",
     layout="wide"
 )
 
-# ── Load models (cached so loads only once) ──
+#  - - Load models  - -
 @st.cache_resource
 def load_all_models():
     import sys
@@ -46,6 +44,14 @@ def load_all_models():
 
 scaler_X, scaler_y, ffnn, rbnn, grnn, df = load_all_models()
 
+#  - - Session state initialization  - -
+if 'predictions' not in st.session_state:
+    st.session_state.predictions = None
+if 'last_LD' not in st.session_state:
+    st.session_state.last_LD = None
+if 'last_eps' not in st.session_state:
+    st.session_state.last_eps = None
+
 def inverse_transform(y_scaled):
     y_raw       = scaler_y.inverse_transform(y_scaled)
     y_out       = y_raw.copy()
@@ -62,9 +68,7 @@ def predict(LD_val, eps_val):
     pg = inverse_transform(grnn.predict(X))[0]
     return pf, pr, pg
 
-# ══════════════════════════════════════════════
 #  HEADER
-# ══════════════════════════════════════════════
 st.title("⚙️ Plain Journal Bearing Performance Predictor")
 st.markdown("""
 **AI-powered prediction using Artificial Neural Networks**  
@@ -74,9 +78,7 @@ st.markdown("""
 
 st.divider()
 
-# ══════════════════════════════════════════════
 #  SIDEBAR — INPUTS
-# ══════════════════════════════════════════════
 with st.sidebar:
     st.header("📥 Input Parameters")
     st.markdown("Adjust the bearing parameters below:")
@@ -122,12 +124,20 @@ with st.sidebar:
     else:
         st.warning("ε ⚠ Outside training range")
 
-# ══════════════════════════════════════════════
-#  MAIN AREA — RESULTS
-# ══════════════════════════════════════════════
+#  STORE PREDICTIONS IN SESSION STATE
 if predict_btn:
-
     pf, pr, pg = predict(LD_val, eps_val)
+    st.session_state.predictions = (pf, pr, pg)
+    st.session_state.last_LD  = LD_val
+    st.session_state.last_eps = eps_val
+
+#  MAIN AREA - RESULTS (persists across re-runs)
+if st.session_state.predictions is not None:
+
+    pf, pr, pg   = st.session_state.predictions
+    LD_used      = st.session_state.last_LD
+    eps_used     = st.session_state.last_eps
+
     model_preds = {'FFNN': pf, 'RBNN': pr, 'GRNN': pg}
     param_keys  = ['S', 'RCf', 'phi', 'Pmax']
     param_names = ['Sommerfeld Number S',
@@ -135,9 +145,9 @@ if predict_btn:
                    'Attitude Angle φ (°)',
                    'Max Pressure Pmax']
 
-    st.subheader(f"📊 Results for L/D = {LD_val}, ε = {eps_val}")
+    st.subheader(f"📊 Results for L/D = {LD_used}, ε = {eps_used}")
 
-    # ── KPI Cards (FFNN results) ──
+    #  - - KPI Cards (FFNN results)  - -
     col1, col2, col3, col4 = st.columns(4)
     cards = [col1, col2, col3, col4]
     icons = ['📈', '🔧', '📐', '💥']
@@ -155,7 +165,7 @@ if predict_btn:
 
     st.divider()
 
-    # ── Bar chart comparison ──
+    #  - - Bar chart comparison  - -
     st.subheader("🔵 Model Comparison — All Parameters")
 
     fig_bar = go.Figure()
@@ -174,7 +184,7 @@ if predict_btn:
 
     fig_bar.update_layout(
         barmode='group',
-        title=f'Predicted Performance Parameters — L/D={LD_val}, ε={eps_val}',
+        title=f'Predicted Performance Parameters — L/D={LD_used}, ε={eps_used}',
         xaxis_title='Performance Parameter',
         yaxis_title='Predicted Value',
         legend_title='Model',
@@ -185,7 +195,7 @@ if predict_btn:
 
     st.divider()
 
-    # ── Table ──
+    #  - - Prediction Table  - -
     st.subheader("📋 Detailed Prediction Table")
     table_data = {'Parameter': param_names}
     for model_name in model_choice:
@@ -196,8 +206,8 @@ if predict_btn:
 
     # Check against Table 8.6 if exact match exists
     match = df[
-        (np.isclose(df['LD'],      LD_val,  atol=1e-3)) &
-        (np.isclose(df['epsilon'], eps_val, atol=1e-3))
+        (np.isclose(df['LD'],      LD_used,  atol=1e-3)) &
+        (np.isclose(df['epsilon'], eps_used, atol=1e-3))
     ]
     if not match.empty:
         actual = match.iloc[0]
@@ -210,15 +220,13 @@ if predict_btn:
         ]
         st.info("✅ Exact match found in Table 8.6 — showing validation error")
 
+    # Show prediction table (NOT the raw df)
     st.dataframe(pd.DataFrame(table_data), use_container_width=True, hide_index=True)
 
     st.divider()
 
-    # ── Parametric sweep plot ──
+    #  - - Parametric sweep plot  - -
     st.subheader("📉 Parametric Analysis — Vary ε at fixed L/D")
-
-    eps_range  = np.arange(0.05, 1.0, 0.05)
-    sweep_data = {m: [] for m in ['FFNN', 'RBNN', 'GRNN']}
 
     selected_param = st.selectbox(
         "Select parameter to plot:",
@@ -227,8 +235,11 @@ if predict_btn:
     )
     param_idx = param_names.index(selected_param)
 
+    eps_range  = np.arange(0.05, 1.0, 0.05)
+    sweep_data = {m: [] for m in ['FFNN', 'RBNN', 'GRNN']}
+
     for e in eps_range:
-        pf_, pr_, pg_ = predict(LD_val, e)
+        pf_, pr_, pg_ = predict(LD_used, e)   # use LD_used (stored value)
         sweep_data['FFNN'].append(pf_[param_idx])
         sweep_data['RBNN'].append(pr_[param_idx])
         sweep_data['GRNN'].append(pg_[param_idx])
@@ -245,19 +256,18 @@ if predict_btn:
         ))
 
     # Add actual Table 8.6 data points
-    subset = df[np.isclose(df['LD'], LD_val, atol=0.05)]
+    subset = df[np.isclose(df['LD'], LD_used, atol=0.05)]
     if not subset.empty:
         fig_sweep.add_trace(go.Scatter(
             x=subset['epsilon'],
             y=subset[param_keys[param_idx]],
             mode='markers',
             name='Table 8.6 (Actual)',
-            marker=dict(symbol='star', size=12,
-                        color='black')
+            marker=dict(symbol='star', size=12, color='black')
         ))
 
     fig_sweep.update_layout(
-        title=f'{selected_param} vs ε  (L/D = {LD_val})',
+        title=f'{selected_param} vs ε  (L/D = {LD_used})',
         xaxis_title='Eccentricity Ratio ε',
         yaxis_title=selected_param,
         template='plotly_white',
@@ -268,11 +278,11 @@ if predict_btn:
 
     st.divider()
 
-    # ── Film thickness visualization ──
+    #   Film thickness visualization 
     st.subheader("🔵 Oil Film Thickness Profile")
 
-    theta   = np.linspace(0, 2 * np.pi, 360)
-    h_theta = 1 + eps_val * np.cos(theta)
+    theta     = np.linspace(0, 2 * np.pi, 360)
+    h_theta   = 1 + eps_used * np.cos(theta)
     theta_deg = np.degrees(theta)
 
     fig_film = go.Figure()
@@ -285,13 +295,13 @@ if predict_btn:
         fillcolor='rgba(70,130,180,0.3)'
     ))
     fig_film.add_hline(
-        y=1 - eps_val,
+        y=1 - eps_used,
         line_dash='dash',
         line_color='red',
-        annotation_text=f'hmin = {1-eps_val:.3f}C'
+        annotation_text=f'hmin = {1-eps_used:.3f}C'
     )
     fig_film.update_layout(
-        title=f'Dimensionless Film Thickness — ε = {eps_val}',
+        title=f'Dimensionless Film Thickness — ε = {eps_used}',
         xaxis_title='Circumferential Angle θ (°)',
         yaxis_title='Dimensionless Film Thickness h̄ = h/C',
         template='plotly_white',
@@ -299,12 +309,11 @@ if predict_btn:
     )
     st.plotly_chart(fig_film, use_container_width=True)
 
-# ── If button not pressed show instructions ──
+# If no prediction yet - show dataset overview 
 else:
     st.info("👈 Set L/D and ε in the sidebar, then click **Predict Performance**")
 
-    # Show dataset overview
-    st.subheader("📚 Dataset Overview — Table 8.6 (Khonsari & Booser)")
+    st.subheader("📚 Dataset Overview - Table 8.6 (Khonsari & Booser)")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Data Points", len(df))
     col2.metric("L/D Values", df['LD'].nunique())
@@ -313,13 +322,13 @@ else:
 
     st.markdown(f"Showing all **{len(df)} rows** from Table 8.6")
     st.dataframe(
-    df[['LD', 'epsilon', 'S', 'RCf', 'phi', 'Pmax']],
-    use_container_width=True,
-    hide_index=True,
-    height=600  # increase height so more rows are visible
+        df[['LD', 'epsilon', 'S', 'RCf', 'phi', 'Pmax']],
+        use_container_width=True,
+        hide_index=True,
+        height=35 * len(df) + 40   # dynamic height — shows all 152 rows
     )
 
-# ── Footer ──
+# Footer
 st.divider()
 st.markdown("""
 <div style='text-align:center; color:gray; font-size:12px'>
