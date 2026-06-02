@@ -17,14 +17,14 @@ sys.path.insert(0, os.path.abspath('.'))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
-#  - - Page config  - -
+
 st.set_page_config(
     page_title="Journal Bearing AI",
     page_icon="⚙️",
     layout="wide"
 )
 
-#  - - Load models  - -
+
 @st.cache_resource
 def load_all_models():
     import sys
@@ -44,7 +44,7 @@ def load_all_models():
 
 scaler_X, scaler_y, ffnn, rbnn, grnn, df = load_all_models()
 
-#  - - Session state initialization  - -
+
 if 'predictions' not in st.session_state:
     st.session_state.predictions = None
 if 'last_LD' not in st.session_state:
@@ -55,15 +55,21 @@ if 'last_eps' not in st.session_state:
 def inverse_transform(y_scaled):
     y_raw       = scaler_y.inverse_transform(y_scaled)
     y_out       = y_raw.copy()
-    y_out[:, 0] = 10 ** y_raw[:, 0]   # S
-    y_out[:, 1] = 10 ** y_raw[:, 1]   # RCf
-    y_out[:, 2] = y_raw[:, 2]         # phi
-    y_out[:, 3] = 10 ** y_raw[:, 3]   # Pmax
+    
+    # Reverse log10 ONLY for the variables we transformed originally
+    y_out[:, 0] = 10 ** y_raw[:, 0]  # S
+    y_out[:, 1] = y_raw[:, 1]        # QL (Linear)
+    y_out[:, 2] = y_raw[:, 2]        # Qi (Linear)
+    y_out[:, 3] = 10 ** y_raw[:, 3]  # RCf
+    y_out[:, 4] = 10 ** y_raw[:, 4]  # Pmax
+    y_out[:, 5] = y_raw[:, 5]        # theta_max (Linear)
+    y_out[:, 6] = y_raw[:, 6]        # phi (Linear)
+    y_out[:, 7] = y_raw[:, 7]        # theta_cav (Linear)
     return y_out
 
 def predict(LD_val, eps_val):
     X = scaler_X.transform([[LD_val, eps_val]])
-    pf = inverse_transform(ffnn.predict(X))[0] if ffnn else np.zeros(4)
+    pf = inverse_transform(ffnn.predict(X))[0] if ffnn else np.zeros(8)
     pr = inverse_transform(rbnn.predict(X))[0]
     pg = inverse_transform(grnn.predict(X))[0]
     return pf, pr, pg
@@ -71,14 +77,12 @@ def predict(LD_val, eps_val):
 #  HEADER
 st.title("⚙️ Plain Journal Bearing Performance Predictor")
 st.markdown("""
-**AI-powered prediction using Artificial Neural Networks**  
-*Based on: Applied Tribology — Khonsari & Booser (Table 8.6)*  
-*Project by: Lavprit Anand | MNNIT Allahabad Summer-Internship 2026*
+**AI-powered prediction using Artificial Neural Networks** *Based on: Applied Tribology — Khonsari & Booser (Table 8.6)* *Project by: Lavprit Anand | MNNIT Allahabad Summer-Internship 2026*
 """)
 
 st.divider()
 
-#  SIDEBAR — INPUTS
+#  SIDEBAR - INPUTS
 with st.sidebar:
     st.header("📥 Input Parameters")
     st.markdown("Adjust the bearing parameters below:")
@@ -139,19 +143,28 @@ if st.session_state.predictions is not None:
     eps_used     = st.session_state.last_eps
 
     model_preds = {'FFNN': pf, 'RBNN': pr, 'GRNN': pg}
-    param_keys  = ['S', 'RCf', 'phi', 'Pmax']
+    
+    # Updated to 8 parameters
+    param_keys  = ['S', 'QL', 'Qi', 'RCf', 'Pmax', 'theta_max', 'phi', 'theta_cav']
     param_names = ['Sommerfeld Number S',
+                   'Leakage Flow QL',
+                   'Inlet Flow Qi',
                    'Friction Variable f(R/C)',
+                   'Max Pressure Pmax',
+                   'Max Pressure Angle θ_max',
                    'Attitude Angle φ (°)',
-                   'Max Pressure Pmax']
+                   'Cavitation Angle θ_cav']
 
     st.subheader(f"📊 Results for L/D = {LD_used}, ε = {eps_used}")
 
     #  - - KPI Cards (FFNN results)  - -
+    # Spread the 8 cards across 2 rows of 4
     col1, col2, col3, col4 = st.columns(4)
-    cards = [col1, col2, col3, col4]
-    icons = ['📈', '🔧', '📐', '💥']
-    units = ['—', '—', '°', '—']
+    col5, col6, col7, col8 = st.columns(4)
+    cards = [col1, col2, col3, col4, col5, col6, col7, col8]
+    
+    icons = ['📈', '💧', '🚰', '🔧', '💥', '🎯', '📐', '🌪️']
+    units = ['—', '—', '—', '—', '—', '°', '°', '°']
 
     for col, icon, name, key, unit in zip(
         cards, icons, param_names, param_keys, units
@@ -172,13 +185,13 @@ if st.session_state.predictions is not None:
     colors  = {'FFNN': '#2196F3', 'RBNN': '#FF5722', 'GRNN': '#4CAF50'}
 
     for model_name in model_choice:
-        vals = [model_preds[model_name][i] for i in range(4)]
+        vals = [model_preds[model_name][i] for i in range(8)]
         fig_bar.add_trace(go.Bar(
             name=model_name,
-            x=param_names,
+            x=param_keys,  # Using keys on X-axis so labels aren't too crowded
             y=vals,
             marker_color=colors[model_name],
-            text=[f"{v:.4f}" for v in vals],
+            text=[f"{v:.3f}" for v in vals],
             textposition='outside'
         ))
 
@@ -201,7 +214,7 @@ if st.session_state.predictions is not None:
     for model_name in model_choice:
         table_data[model_name] = [
             f"{model_preds[model_name][i]:.5f}"
-            for i in range(4)
+            for i in range(8)
         ]
 
     # Check against Table 8.6 if exact match exists
@@ -216,19 +229,19 @@ if st.session_state.predictions is not None:
         ]
         table_data['FFNN Error %'] = [
             f"{abs(pf[i] - actual[param_keys[i]]) / (abs(actual[param_keys[i]]) + 1e-10) * 100:.2f}%"
-            for i in range(4)
+            for i in range(8)
         ]
         table_data['RBNN Error %'] = [
             f"{abs(pr[i] - actual[param_keys[i]]) / (abs(actual[param_keys[i]]) + 1e-10) * 100:.2f}%"
-            for i in range(4)
+            for i in range(8)
         ]
         table_data['GRNN Error %'] = [
             f"{abs(pg[i] - actual[param_keys[i]]) / (abs(actual[param_keys[i]]) + 1e-10) * 100:.2f}%"
-            for i in range(4)
+            for i in range(8)
         ]
         st.info("✅ Exact match found in Table 8.6 — showing validation error")
 
-    # Show prediction table (NOT the raw df)
+    
     st.dataframe(pd.DataFrame(table_data), use_container_width=True, hide_index=True)
 
     st.divider()
@@ -286,7 +299,7 @@ if st.session_state.predictions is not None:
 
     st.divider()
 
-    #   Film thickness visualization 
+    #  Film thickness visualization 
     st.subheader("🔵 Oil Film Thickness Profile")
 
     theta     = np.linspace(0, 2 * np.pi, 360)
@@ -326,11 +339,11 @@ else:
     col1.metric("Total Data Points", len(df))
     col2.metric("L/D Values", df['LD'].nunique())
     col3.metric("ε Values per L/D", df['epsilon'].nunique())
-    col4.metric("Output Parameters", "4")
+    col4.metric("Output Parameters", "8") # Updated to 8
 
     st.markdown(f"Showing all **{len(df)} rows** from Table 8.6")
     st.dataframe(
-        df[['LD', 'epsilon', 'S', 'RCf', 'phi', 'Pmax']],
+        df[['LD', 'epsilon', 'S', 'QL', 'Qi', 'RCf', 'Pmax', 'theta_max', 'phi', 'theta_cav']],
         use_container_width=True,
         hide_index=True,
         height=35 * len(df) + 40   # dynamic height — shows all 152 rows

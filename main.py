@@ -15,11 +15,14 @@ import joblib
 from data.table86_data    import *
 from src.data_prep        import load_data, explore_data, prepare_data
 from src.train_models     import train_ffnn, train_rbnn, train_grnn
+
+
 from src.evaluate         import (evaluate_model,
                                   plot_predictions,
                                   regression_plot,
                                   plot_error_comparison,
-                                  time_model)
+                                  time_model,
+                                  PARAM_NAMES) 
 
 os.makedirs('models',        exist_ok=True)
 os.makedirs('results/plots', exist_ok=True)
@@ -69,15 +72,15 @@ m_rbnn = evaluate_model('RBNN', y_te, pred_rbnn)
 m_grnn = evaluate_model('GRNN', y_te, pred_grnn)
 
 #  Error comparison table 
-print("\n" + "="*70)
+
+print("\n" + "="*85)
 print("  FINAL ERROR COMPARISON TABLE (on test set)")
-print("="*70)
-params = ['Sommerfeld S', 'Friction f(R/C)',
-          'Attitude φ°',  'Pmax']
-print(f"{'Parameter':<20} {'FFNN MAPE%':>12} "
+print("="*85)
+print(f"{'Parameter':<25} {'FFNN MAPE%':>12} "
       f"{'RBNN MAPE%':>12} {'GRNN MAPE%':>12}  Best")
-print("-"*70)
-for i, p in enumerate(params):
+print("-" * 85)
+
+for p in PARAM_NAMES:
     fm = float(m_ffnn.loc[p, 'MAPE (%)'])
     rm = float(m_rbnn.loc[p, 'MAPE (%)'])
     gm = float(m_grnn.loc[p, 'MAPE (%)'])
@@ -86,10 +89,10 @@ for i, p in enumerate(params):
         'FFNN' if best_val == fm else
         'RBNN' if best_val == rm else 'GRNN'
     )
-    print(f"{p:<20} {fm:>11.2f}% "
+    print(f"{p:<25} {fm:>11.2f}% "
           f"{rm:>11.2f}% {gm:>11.2f}%  "
           f"→ {best_name}")
-print("="*70)
+print("="*85)
 
 #  Plots 
 print("\nSaving plots...")

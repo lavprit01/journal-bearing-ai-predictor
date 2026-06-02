@@ -16,7 +16,7 @@ import pandas as pd
 import joblib
 import tensorflow as tf
 
-# ── Load scalers and models ──
+# 
 scaler_X = joblib.load('models/scaler_X.pkl')
 scaler_y = joblib.load('models/scaler_y.pkl')
 ffnn     = tf.keras.models.load_model(
@@ -27,21 +27,29 @@ print("✅ All models loaded successfully!\n")
 
 df = pd.read_csv('data/table86_data.csv')
 
-PARAM_KEYS   = ['S', 'RCf', 'phi', 'Pmax']
-PARAM_LABELS = ['S  (Sommerfeld No.)',
-                'RCf (Friction Var.)',
-                'phi (Attitude °)',
-                'Pmax (Max Pressure)']
-
+PARAM_KEYS   = ['S', 'QL', 'Qi', 'RCf', 'Pmax', 'theta_max', 'phi', 'theta_cav']
+PARAM_LABELS = ['S  (Sommerfeld)',
+                'QL (Leakage Flow)',
+                'Qi (Inlet Flow)',
+                'RCf (Friction Var)',
+                'Pmax (Max Press)',
+                'θ_max (Peak Press °)',
+                'φ (Attitude °)',
+                'θ_cav (Cavitation °)']
 
 def inverse_transform(y_scaled):
-    y_raw       = scaler_y.inverse_transform(
-                      y_scaled)
+    y_raw       = scaler_y.inverse_transform(y_scaled)
     y_out       = y_raw.copy()
+    
+    # Reverse log10 ONLY for the variables we transformed in data_prep.py
     y_out[:, 0] = 10 ** y_raw[:, 0]  # S
-    y_out[:, 1] = 10 ** y_raw[:, 1]  # RCf
-    y_out[:, 2] = y_raw[:, 2]        # phi
-    y_out[:, 3] = 10 ** y_raw[:, 3]  # Pmax
+    y_out[:, 1] = y_raw[:, 1]        # QL (Linear)
+    y_out[:, 2] = y_raw[:, 2]        # Qi (Linear)
+    y_out[:, 3] = 10 ** y_raw[:, 3]  # RCf
+    y_out[:, 4] = 10 ** y_raw[:, 4]  # Pmax
+    y_out[:, 5] = y_raw[:, 5]        # theta_max (Linear)
+    y_out[:, 6] = y_raw[:, 6]        # phi (Linear)
+    y_out[:, 7] = y_raw[:, 7]        # theta_cav (Linear)
     return y_out
 
 
@@ -70,7 +78,7 @@ def show_result(LD_val, eps_val):
 
     pf, pr, pg = predict_all(LD_val, eps_val)
 
-    # Check Table 8.6
+    
     match = df[
         (np.isclose(df['LD'],
                     LD_val,  atol=1e-3)) &
@@ -114,7 +122,7 @@ def show_result(LD_val, eps_val):
             )
         print("-"*85)
 
-        # Overall best model
+        
         all_fe = [
             abs(pf[i] - actual[k]) /
             (abs(actual[k]) + 1e-10) * 100

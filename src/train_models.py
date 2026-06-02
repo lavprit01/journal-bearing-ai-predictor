@@ -20,7 +20,7 @@ os.makedirs('results/plots', exist_ok=True)
 
 #  FFNN
 
-def build_ffnn(input_dim=2, output_dim=4):
+def build_ffnn(input_dim=2, output_dim=8):
     model = keras.Sequential([
         layers.Input(shape=(input_dim,)),
         layers.Dense(128, activation='relu'),
@@ -136,3 +136,26 @@ def train_grnn(X_tr, y_tr):
     print("✅ GRNN Done!")
     print("   Saved: models/grnn_model.pkl")
     return model
+
+if __name__ == '__main__':
+    from src.data_prep import load_data, prepare_data
+    
+    print("🚀 Starting training pipeline...")
+    
+    # 1. Load the data
+    df = load_data('data/table86_data.csv')
+    
+    # 2. Prepare the data 
+    X_tr, X_val, X_te, y_tr, y_val, y_te, scaler_X, scaler_y = prepare_data(df)
+    
+    # 3. Save the scalers so test_single_input.py 
+    joblib.dump(scaler_X, 'models/scaler_X.pkl')
+    joblib.dump(scaler_y, 'models/scaler_y.pkl')
+    print("✅ Scalers saved to models/ directory.")
+    
+    # 4. Train the models
+    train_ffnn(X_tr, y_tr, X_val, y_val, epochs=3000)
+    train_rbnn(X_tr, y_tr)
+    train_grnn(X_tr, y_tr)
+    
+    print("\n🎉 Training Complete! All models and scalers are saved.")
