@@ -11,30 +11,19 @@ import os
 
 def load_data(filepath='data/table86_data.csv'):
     df = pd.read_csv(filepath)
-    print(f"Data loaded: {df.shape[0]} rows, "
-          f"{df.shape[1]} columns")
+    print(f"Data loaded: {df.shape[0]} rows, {df.shape[1]} columns")
     return df
 
 def explore_data(df):
     print("\n--- Data Summary ---")
+    print(df[['LD', 'epsilon', 'S', 'QL', 'Qi', 'RCf', 'Pmax', 'theta_max', 'phi', 'theta_cav']].describe().round(4))
     
-    print(df[['LD', 'epsilon', 'S', 'QL', 'Qi', 'RCf', 
-              'Pmax', 'theta_max', 'phi', 'theta_cav']].describe().round(4))
-    print("\n--- Missing Values ---")
-    print(df.isnull().sum())
-
     os.makedirs('results/plots', exist_ok=True)
-    
     fig, axes = plt.subplots(4, 2, figsize=(14, 18))
     outputs = ['S', 'QL', 'Qi', 'RCf', 'Pmax', 'theta_max', 'phi', 'theta_cav']
-    titles  = ['Sommerfeld Number S',
-               'Leakage Flow QL',
-               'Inlet Flow Qi',
-               'Friction Variable f(R/C)',
-               'Max Pressure Pmax',
-               'Max Pressure Angle θ_max',
-               'Attitude Angle φ (°)',
-               'Cavitation Angle θ_cav']
+    titles  = ['Sommerfeld Number S', 'Leakage Flow QL', 'Inlet Flow Qi',
+               'Friction Variable f(R/C)', 'Max Pressure Pmax',
+               'Max Pressure Angle θ_max', 'Attitude Angle φ (°)', 'Cavitation Angle θ_cav']
     
     ld_vals = sorted(df['LD'].unique())
     colors  = plt.cm.tab10(np.linspace(0, 1, len(ld_vals)))
@@ -42,7 +31,6 @@ def explore_data(df):
     for ax, col, title in zip(axes.flatten(), outputs, titles):
         for ld, color in zip(ld_vals, colors):
             sub = df[df['LD'] == ld]
-            
             if col in ['S', 'RCf', 'Pmax']:
                 ax.semilogy(sub['epsilon'], sub[col], marker='o', color=color, label=f'L/D={ld}', markersize=4)
             else:
@@ -58,14 +46,9 @@ def explore_data(df):
     plt.close()
     print("EDA plot saved.")
 
-def prepare_data(
-    df,
-    input_cols  = ['LD', 'epsilon'],
-    output_cols = ['S', 'QL', 'Qi', 'RCf', 'Pmax', 'theta_max', 'phi', 'theta_cav'],
-    test_size   = 0.15,
-    val_size    = 0.15,
-    random_seed = 42
-):
+def prepare_data(df, input_cols=['LD', 'epsilon'], 
+                 output_cols=['S', 'QL', 'Qi', 'RCf', 'Pmax', 'theta_max', 'phi', 'theta_cav'],
+                 test_size=0.15, val_size=0.15, random_seed=42):
     X = df[input_cols].values.astype(float)
     y = df[output_cols].values.astype(float)
 
@@ -89,10 +72,5 @@ def prepare_data(
     X_tr, X_tmp, y_tr, y_tmp = train_test_split(X_s, y_s, test_size=total_test, random_state=random_seed)
     rel_val = val_size / total_test
     X_val, X_te, y_val, y_te = train_test_split(X_tmp, y_tmp, test_size=(1 - rel_val), random_state=random_seed)
-
-    print(f"\nData split:")
-    print(f"  Train      : {len(X_tr)}")
-    print(f"  Validation : {len(X_val)}")
-    print(f"  Test       : {len(X_te)}")
 
     return (X_tr, X_val, X_te, y_tr, y_val, y_te, scaler_X, scaler_y)

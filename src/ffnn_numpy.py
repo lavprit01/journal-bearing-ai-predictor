@@ -3,12 +3,8 @@ import numpy as np
 
 class FFNNNumpy:
     def __init__(self, weights_path):
-        self.weights = np.load(
-            weights_path,
-            allow_pickle=True
-        )
-        print(f"FFNNNumpy loaded: "
-              f"{len(self.weights)} arrays")
+        self.weights = np.load(weights_path, allow_pickle=True)
+        print(f"FFNNNumpy loaded: {len(self.weights)} arrays")
 
     def _relu(self, x):
         return np.maximum(0, x)
