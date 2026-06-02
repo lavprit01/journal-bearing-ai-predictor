@@ -8,6 +8,7 @@ from scipy.optimize import brentq
 import os
 import sys
 
+# Ensure relative imports work on Streamlit Cloud
 sys.path.insert(0, os.path.abspath('.'))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -84,7 +85,7 @@ app_mode = st.sidebar.radio(
 st.sidebar.divider()
 
 
-# MODE 1: THE APP
+# MODE 1: THE ORIGINAL APP
 
 if "1." in app_mode:
     if 'predictions' not in st.session_state:
@@ -116,7 +117,7 @@ if "1." in app_mode:
 
         st.subheader(f"📊 Results for L/D = {LD_used}, ε = {eps_used}")
 
-        # KPI Cards (2 rows of 4)
+        # KPI Cards
         c1, c2, c3, c4 = st.columns(4)
         c5, c6, c7, c8 = st.columns(4)
         cards = [c1, c2, c3, c4, c5, c6, c7, c8]
@@ -139,7 +140,7 @@ if "1." in app_mode:
 
         st.divider()
 
-        
+        # Detailed Prediction Table
         st.subheader("📋 Detailed Prediction Table")
         table_data = {'Parameter': param_names}
         for model_name in model_choice:
@@ -162,7 +163,7 @@ if "1." in app_mode:
         st.dataframe(pd.DataFrame(table_data), use_container_width=True, hide_index=True)
         st.divider()
 
-        
+        # Parametric Sweep Plot
         st.subheader("📉 Parametric Analysis — Vary ε at fixed L/D")
         selected_param = st.selectbox("Select parameter to plot:", param_names, index=0)
         param_idx = param_names.index(selected_param)
@@ -222,11 +223,15 @@ elif "2." in app_mode:
     
     with st.sidebar:
         st.header("📥 Operating Conditions")
+        
+        # Let the user choose the AI Engine
+        solver_engine = st.selectbox("🧠 Select AI Engine", ["FFNN", "RBNN", "GRNN"], index=2, help="Choose the model with the lowest error to drive the solver.")
+        
         W_load = st.number_input("Bearing Radial Load (lbf)", value=1600.0, step=100.0)
         N_rpm = st.number_input("Shaft Speed (rpm)", value=1800.0, step=100.0)
         T_in = st.number_input("Inlet Oil Temp (°F)", value=166.0, step=1.0)
         
-        st.subheader("Geometry")
+        st.subheader("Geometry (Ex 8.2)")
         D_in = st.number_input("Diameter D (in)", value=4.0, step=0.1)
         L_in = st.number_input("Length L (in)", value=4.0, step=0.1)
         C_in = st.number_input("Radial Clearance C (in)", value=0.002, step=0.0001, format="%.4f")
@@ -238,57 +243,87 @@ elif "2." in app_mode:
         solve_btn = st.button("🔥 Run Thermal Solver", use_container_width=True, type="primary")
 
     if solve_btn:
-        with st.spinner("AI is solving the thermal loop..."):
+        with st.spinner(f"{solver_engine} is solving the thermal loop..."):
             R, L_D, N_s, P_unit, J = D_in / 2.0, L_in / D_in, N_rpm / 60.0, W_load / (L_in * D_in), 9336
             T_eff, tolerance, history, final_ai_preds = T_in, 0.5, [], None
             
-            def get_ffnn_preds(eps):
-                return inverse_transform(ffnn.predict(scaler_X.transform([[L_D, eps]])))[0]
+            def get_solver_preds(eps):
+                X_sc = scaler_X.transform([[L_D, eps]])
+                if solver_engine == "FFNN": return inverse_transform(ffnn.predict(X_sc))[0]
+                elif solver_engine == "RBNN": return inverse_transform(rbnn.predict(X_sc))[0]
+                else: return inverse_transform(grnn.predict(X_sc))[0]
                 
             def obj_func(eps, target_S):
-                return get_ffnn_preds(eps)[0] - target_S
+                return get_solver_preds(eps)[0] - target_S
                 
             for i in range(1, 21):
+                # 1. Viscosity (Vogel Eq)
                 mu = 1.30e-6 * np.exp(-0.0294 * (T_eff - 166.0))
+                
+                # 2. Target S
                 S_target = ((R/C_in)**2) * (mu * N_s) / P_unit
+                
+                # 3. AI Root Finding
                 try: 
                     eps_found = brentq(obj_func, 0.05, 0.95, args=(S_target,))
                 except ValueError: 
                     st.error(f"Design out of bounds! Target S={S_target:.4f} is too extreme for the AI.")
                     break
                     
-                final_ai_preds = get_ffnn_preds(eps_found)
+                # 4. Heat Balance
+                final_ai_preds = get_solver_preds(eps_found)
                 F_friction = (final_ai_preds[3] / (R/C_in)) * W_load
                 Power_Loss = F_friction * (2 * np.pi * R * N_s)
-                Delta_T = Power_Loss / (rho * cp * (final_ai_preds[1] * R * C_in * N_s * L_in) * J * 2.5) 
                 
+                Actual_Flow = final_ai_preds[1] * (R * C_in * N_s * L_in)
+                Delta_T = Power_Loss / (rho * cp * Actual_Flow * J * 2.5) 
+                
+                # 5. Update
                 T_new = T_in + (Delta_T / 2.0)
-                history.append({"Iter": i, "T_eff (°F)": round(T_eff, 2), "μ (reyns)": f"{mu:.2e}", "S": round(S_target, 4), "ε": round(eps_found, 4), "ΔT (°F)": round(Delta_T, 2)})
-                if abs(T_new - T_eff) <= tolerance: break
+                history.append({
+                    "Iter": i, "T_eff (°F)": round(T_eff, 2), "μ (reyns)": f"{mu:.2e}",
+                    "S": round(S_target, 4), "ε": round(eps_found, 4), "ΔT (°F)": round(Delta_T, 2)
+                })
+                
+                if abs(T_new - T_eff) <= tolerance: 
+                    break
                 T_eff = T_new
                 
-            st.success(f"✅ Equilibrium Reached in {len(history)} iterations!")
+            # --- RENDER SOLVER OUTPUTS ---
+            st.success(f"✅ Equilibrium Reached in {len(history)} iterations using {solver_engine}!")
+            
             st.subheader(f"🏁 Final Bearing Design Specifications (T_eff = {T_eff:.1f} °F)")
             st.markdown(f"**Operating Viscosity:** {mu:.2e} reyns | **Operating Eccentricity:** {eps_found:.4f} | **Min Film Thickness:** {C_in * (1 - eps_found) * 1e6:.0f} µin")
             
+            # Show all 8 Exact Parameters for the converged state
             c1, c2, c3, c4 = st.columns(4)
             c5, c6, c7, c8 = st.columns(4)
-            for col, icon, name, key, unit in zip([c1,c2,c3,c4,c5,c6,c7,c8], icons, param_names, param_keys, units):
-                col.metric(label=f"{icon} {key}", value=f"{final_ai_preds[param_keys.index(key)]:.4f} {unit}", help=name)
+            cards = [c1, c2, c3, c4, c5, c6, c7, c8]
+            
+            for col, icon, name, key, unit in zip(cards, icons, param_names, param_keys, units):
+                val = final_ai_preds[param_keys.index(key)]
+                col.metric(label=f"{icon} {key}", value=f"{val:.4f} {unit}", help=name)
                 
             st.divider()
             
-            
+            # FULL WIDTH Temperature Convergence Chart
             st.subheader("📈 Temperature Convergence")
             df_hist = pd.DataFrame(history)
-            st.plotly_chart(px.line(df_hist, x="Iter", y="T_eff (°F)", markers=True), use_container_width=True)
+            fig_t = px.line(df_hist, x="Iter", y="T_eff (°F)", markers=True)
+            st.plotly_chart(fig_t, use_container_width=True)
             
             st.divider()
 
+            # FULL WIDTH Iteration History Table with CENTERED Text
             st.subheader("🔄 Iteration History")
             
-            st.dataframe(df_hist, use_container_width=True, hide_index=True)
+            # Apply Pandas styling to center the text and headers
+            styled_df = df_hist.style.set_properties(**{'text-align': 'center'})
+            styled_df = styled_df.set_table_styles([dict(selector='th', props=[('text-align', 'center')])])
+            
+            st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
 # Footer
 st.divider()
-st.markdown("<div style='text-align:center; color:gray; font-size:12px'>Journal Bearing AI Predictor | Applied Tribology | MNNIT Allahabad 2026</div>", unsafe_allow_html=True)
+st.markdown("""<div style='text-align:center; color:gray; font-size:12px'>
+Journal Bearing AI Predictor | Applied Tribology — Khonsari & Booser | MNNIT Allahabad Summer Internship 2026</div>""", unsafe_allow_html=True)
